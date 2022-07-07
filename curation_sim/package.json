@@ -1,0 +1,12 @@
+{
+  "name": "curation sims",
+  "version": "1.0.0",
+  "description": "https://observablehq.com/@zerim/curation-pools-prototype",
+  "main": "main.js",
+  "author": "alexander papageorge",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "lodash": "^4.17.21"
+  }
+}
