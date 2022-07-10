@@ -1,0 +1,127 @@
+import copy
+from dataclasses import dataclass
+import logging
+from typing import Tuple, List, Callable, Dict
+
+from curation_sim.pools.curation_pool import CurationPool
+from curation_sim.pools.secondary_pool import SecondaryPool
+from curation_sim.pools.token import Token
+from curation_sim.pools.chain import Chain
+from curation_sim.pools.utils import ADDRESS_t
+
+_log = logging.getLogger(__name__)
+
+
+@dataclass
+class Action:
+    action_type: str
+    target: str
+    args: List
+
+
+@dataclass
+class Config:
+    initialReserveTokenBalances: List[Tuple[ADDRESS_t, int]]
+    initialShareBalances: List[Tuple[ADDRESS_t, int]]
+    initialDeposits: List[Tuple[ADDRESS_t, int]]
+    actions: List[Action]
+    recordState: Callable[[Token, CurationPool], Dict]
+
+
+scenario_1_config = Config(
+    initialReserveTokenBalances=[
+        ('0x0', 0),
+        ('queryMarket', 10000),
+        ('curator1', 0),
+        ('curator2', 1000),
+        ('curationPool', 500),
+    ],
+    initialShareBalances=[
+        ('curator1', 1000),
+        ('curator2', 0),
+    ],
+    initialDeposits=[
+        ('curator1', 500),
+        ('curator2', 0),
+    ],
+    actions=[
+        Action(action_type="SLEEP", target='chain', args=[100]),
+        Action(action_type="DEPOSIT", target='curationPool', args=['curator2', 1000]),
+        Action(action_type="SLEEP", target='chain', args=[100]),
+        Action(action_type="CLAIM", target='curationPool', args=['curator2']),
+        Action(action_type="SLEEP", target='chain', args=[10000]),
+        Action(action_type="CLAIM", target='curationPool', args=['curator2']),
+        Action(action_type="CLAIM", target='curationPool', args=['curator1']),
+        Action(action_type="SLEEP", target='chain', args=[100000]),  # Note: setting sleep too high runs into precision issues
+        Action(action_type="CLAIM", target='curationPool', args=['curator2']),
+        Action(action_type="CLAIM", target='curationPool', args=['curator1'])
+    ],
+    recordState=lambda state: {
+        'shareBalances': copy.deepcopy(state.curationPool.shareToken.balances),
+        'depositBalances': copy.deepcopy(state.curationPool.deposits),
+        'totalShares': copy.deepcopy(state.curationPool.totalShares),
+        'primaryPoolTotalDeposits': copy.deepcopy(state.curationPool.reserveToken.balanceOf(state.curationPool.address)),
+        'secondaryPoolTotalDeposits': copy.deepcopy(state.curationPool.secondaryPool.totalDeposits),
+        'reserveBalances': copy.deepcopy(state.reserveToken.balances),
+        'curator2_to_curator1_shareRatio': state.curationPool.shareToken.balanceOf(
+            'curator2') / state.curationPool.shareToken.balanceOf('curator1'),
+        'curator2_to_curator1_depositRatio': state.curationPool.depositOf('curator2') / state.curationPool.depositOf('curator1')
+    }
+)
+
+
+def simulate3(actions,
+              state,
+              recordState):
+
+    log = [{'action': {'action_type': 'INITIAL_STATE'},
+            'state': recordState(state)}]
+
+    for action in actions:
+        try:
+            method_name = action.action_type.lower()
+            actor = getattr(state, action.target)
+            # perform action
+            getattr(actor, method_name)(*action.args)
+
+            log.append({'action': action,
+                        'state': recordState(state)})
+
+        except Exception as e:
+            _log.error(e)
+            log.append({'action': action,
+                        'state': recordState(state)})
+    return log
+
+
+chain = Chain()
+reserveToken = Token(initialBalances={k: v for (k, v) in scenario_1_config.initialReserveTokenBalances})
+
+curationPool = CurationPool(
+      address='curationPool',
+      reserveToken=reserveToken,
+      secondary_pool_cls=SecondaryPool,
+      chain=chain,
+      initialShareBalances=scenario_1_config.initialShareBalances,
+      initialDeposits=scenario_1_config.initialDeposits,
+      issuanceRate=0.0001)
+
+
+@dataclass
+class State:
+    chain: Chain
+    reserveToken: Token
+    curationPool: CurationPool
+
+
+state = State(chain,
+              reserveToken,
+              curationPool)
+
+
+sim_result = simulate3(scenario_1_config.actions,
+                       state,
+                       scenario_1_config.recordState)
+
+for i in sim_result:
+    print(i)

@@ -130,5 +130,11 @@ dmypy.json
 
 # savefiles
 *~
+
+# js
 */node_modules/*
 package-lock.json
+
+# pycharm
+*/.idea/*
+.idea
