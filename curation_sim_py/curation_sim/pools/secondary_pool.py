@@ -33,7 +33,7 @@ class SecondaryPool:
         self.reserveToken: Token = reserveToken
         self.address: ADDRESS_t = address
         self.totalDeposits: NUMERIC_t = totalDeposits
-        self.primaryPool: CurationPool = primaryPool
+        self.primaryPool: PrimaryPool = primaryPool
   
     # Updates deposits without claiming accumulated royalties or shares
     def _updateDeposit(self, account: ADDRESS_t, amount: float):
@@ -43,11 +43,11 @@ class SecondaryPool:
                                              deposit=amount)
         self.totalDeposits += (amount - prevDeposit)
   
-    def _distributeShares(self, shares: float):
+    def _distributeShares(self, shares: NUMERIC_t):
         if self.totalDeposits > 0:
             self.accSharesPerDeposit += (shares/self.totalDeposits)
         else:
-            self.shareToken.burn(shares)
+            self.shareToken.burn(self.address, shares)
 
     def _distributeRoyalties(self, royalties):
         self.accRoyaltiesPerDeposit += (royalties/self.totalDeposits)

@@ -10,11 +10,11 @@ _log = logging.Logger(__name__)
 EMPTY_CONTEXT = Context("", "", 0, 0, 0)
 
 
-def update_context(ctx, **kwargs):
-    new_ctx = copy.deepcopy(ctx)
+def update_context(context, **kwargs):
+    new_context = copy.deepcopy(context)
     for k, v in kwargs.items():
-        setattr(new_ctx, k, v)
-    return new_ctx
+        setattr(new_context, k, v)
+    return new_context
 
 
 class Token:
@@ -57,20 +57,20 @@ class Token:
             hook(context)
         return context
 
-    def _validateTransfer(self, ctx: Context):  # amount, senderInitialBalance, ...rest):
-        senderInitialBalance = ctx.senderInitialBalance
-        amount = ctx.amount
+    def _validateTransfer(self, context: Context):
+        senderInitialBalance = context.senderInitialBalance
+        amount = context.amount
         if senderInitialBalance < amount:
             if (amount-senderInitialBalance) < 0.000001:  # // This addresses some Javascript math imprecision
                 _log.info("Token_transfer: Rounding down amount to address precision issues")
-                _log.info(ctx)
+                _log.info(context)
                 amount = senderInitialBalance
             else:
-                _log.warning(f"Token_transfer: Sender has insufficient funds: {ctx}")
-                _log.info(ctx)
-                return ctx
+                _log.warning(f"Token_transfer: Sender has insufficient funds: {context}")
+                _log.info(context)
+                return context
 
-        return update_context(ctx, amount=amount)
+        return update_context(context, amount=amount)
 
     def _executeTransfer(self, context: Context):
         self.balances[context.fromAccount] = context.senderInitialBalance - context.amount
@@ -94,6 +94,7 @@ class Token:
         ctx = self._validateTransfer(ctx)
         ctx = self._executeTransfer(ctx)
         ctx = self._postTransfer(ctx)
+        return ctx
 
     def _preMint(self, context: Context):
         for hook in self.hooks['preMint']:
@@ -139,10 +140,13 @@ class Token:
             hook(context)
         return context
 
-    def burn(self, context: Context):
-        senderInitialBalance = self.balanceOf(context.fromAccount)
+    def burn(self, fromAccount: ADDRESS_t, amount: NUMERIC_t):
+        senderInitialBalance = self.balanceOf(fromAccount)
 
-        ctx = self._preBurn(update_context(context, senderInitialBalance=senderInitialBalance))
+        ctx = self._preBurn(update_context(EMPTY_CONTEXT,
+                                           fromAccount=fromAccount,
+                                           amount=amount,
+                                           senderInitialBalance=senderInitialBalance))
         ctx = self._validateBurn(ctx)
         ctx = self._executeBurn(ctx)
         return self._postBurn(ctx)

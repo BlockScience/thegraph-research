@@ -4,7 +4,7 @@ import unittest
 from curation_sim.pools.token import Context, update_context
 
 
-class TestStringMethods(unittest.TestCase):
+class TestUpdateContext(unittest.TestCase):
 
     def test_update_ctx(self):
         ctx = Context(fromAccount="0", toAccount="1", amount=2, senderInitialBalance=3, receiverInitialBalance=4)

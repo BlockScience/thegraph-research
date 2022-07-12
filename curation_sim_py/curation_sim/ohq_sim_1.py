@@ -1,31 +1,17 @@
+"""
+In this scenario, we demonstrate how even though one Curator (curator1) initially owned 100% of shares, with a deposit
+of 500 GRT. That after curator2 deposits 1000 GRT and subequently enough time passes, the ratio of share ownership
+between curator2 and curator1 is approximately equal to their ratio of reserve deposits. This satisfies our definition
+of allocative efficiency.
+"""
+
 import copy
-from dataclasses import dataclass
-import logging
-from typing import Tuple, List, Callable, Dict
 
 from curation_sim.pools.curation_pool import CurationPool
 from curation_sim.pools.secondary_pool import SecondaryPool
 from curation_sim.pools.token import Token
 from curation_sim.pools.chain import Chain
-from curation_sim.pools.utils import ADDRESS_t
-
-_log = logging.getLogger(__name__)
-
-
-@dataclass
-class Action:
-    action_type: str
-    target: str
-    args: List
-
-
-@dataclass
-class Config:
-    initialReserveTokenBalances: List[Tuple[ADDRESS_t, int]]
-    initialShareBalances: List[Tuple[ADDRESS_t, int]]
-    initialDeposits: List[Tuple[ADDRESS_t, int]]
-    actions: List[Action]
-    recordState: Callable[[Token, CurationPool], Dict]
+from curation_sim.sim_utils import Config, State, Action, simulate3
 
 
 scenario_1_config = Config(
@@ -70,30 +56,6 @@ scenario_1_config = Config(
 )
 
 
-def simulate3(actions,
-              state,
-              recordState):
-
-    log = [{'action': {'action_type': 'INITIAL_STATE'},
-            'state': recordState(state)}]
-
-    for action in actions:
-        try:
-            method_name = action.action_type.lower()
-            actor = getattr(state, action.target)
-            # perform action
-            getattr(actor, method_name)(*action.args)
-
-            log.append({'action': action,
-                        'state': recordState(state)})
-
-        except Exception as e:
-            _log.error(e)
-            log.append({'action': action,
-                        'state': recordState(state)})
-    return log
-
-
 chain = Chain()
 reserveToken = Token(initialBalances={k: v for (k, v) in scenario_1_config.initialReserveTokenBalances})
 
@@ -105,13 +67,6 @@ curationPool = CurationPool(
       initialShareBalances=scenario_1_config.initialShareBalances,
       initialDeposits=scenario_1_config.initialDeposits,
       issuanceRate=0.0001)
-
-
-@dataclass
-class State:
-    chain: Chain
-    reserveToken: Token
-    curationPool: CurationPool
 
 
 state = State(chain,

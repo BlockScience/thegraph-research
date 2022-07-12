@@ -55,7 +55,7 @@ class CurationPool(PrimaryPool):
         self.valuationMultiple: NUMERIC_t = valuationMultiple
   
     # Users can deposit reserves, without buying shares. These are principal-protected
-    def deposit(self, fromAccount: ADDRESS_t, amount: float):
+    def deposit(self, fromAccount: ADDRESS_t, amount: NUMERIC_t):
         if self.reserveToken.balanceOf(fromAccount) < amount:
             raise AssertionError("CurationPool_deposit: User has insufficient funds")
 
@@ -136,7 +136,7 @@ class CurationPool(PrimaryPool):
 
     # Mints shares into the secondary pool according to the issuance rate.
     def mintShares(self):
-        sharesToMint = (self.shareToken.totalSupply * (1 + self.issuanceRate)**(self.chain.blockHeight - self.lastMintedBlock)) - self.shareToken.totalSupply
+        sharesToMint = self.totalShares - self.shareToken.totalSupply
         self.shareToken.mint(self.secondaryPool.address, sharesToMint)
         self.secondaryPool._distributeShares(sharesToMint)
         self.lastMintedBlock = self.chain.blockHeight
