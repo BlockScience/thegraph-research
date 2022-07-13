@@ -19,10 +19,14 @@ increasing the number of total shares, according to the formula:
 
 which is to say that the number of shares increases exponentially in time.
 
-The second step invokes the `deposit` method of the curation pool, in effect having the market
+The second step invokes the `deposit(curator2)` method of the curation pool, in effect having the market
 participant `curator2` deposit some amount of the reserve token into the curation pool. Depositing
 effects the following:
 - royalties are claimed
   - share tokens are minted into the secondary pool
-  - new shares are distributed according to `accSharesPerDeposit += (shares/totalDeposits)`
+  - new shares are distributed according to `accSharesPerDeposit += (shares/totalDeposits)`.
+  - the accumulated shares and royalties are claimed by curator2
+- the desired amount of the reserve token is transferred
+- the deposit is registered in the secondary pool
 
+the fourth step has the user `curator2` claim accumulated shares and royalties, which is also part of the deposit method.

@@ -107,7 +107,7 @@ class CurationPool(PrimaryPool):
         self.reserveToken.transfer(self.address, account, owedRoyalties)
       
         if account == self.secondaryPool.address:
-          self.secondaryPool._distributeRoyalties(owedRoyalties)
+            self.secondaryPool._distributeRoyalties(owedRoyalties)
 
         self.snapshots[account] = prevSnapshot
         self.snapshots[account].accRoyaltiesPerShare = self.accRoyaltiesPerShare
