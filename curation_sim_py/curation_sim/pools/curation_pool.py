@@ -82,7 +82,7 @@ class CurationPool(PrimaryPool):
         self.secondaryPool._updateDeposit(context.toAccount, self.depositOf(context.toAccount))
 
     # Allows a user to buy newly minted shares by paying the self-assessed value of those shares.
-    def buyShares(self, account: ADDRESS_t, shares):
+    def buyShares(self, account: ADDRESS_t, shares: NUMERIC_t):
         totalSelfAssessedValue = self.reserveToken.balanceOf(self.address) * self.valuationMultiple
         dilutionPercentage = shares / (shares + self.totalShares)
         purchaseCost = totalSelfAssessedValue * dilutionPercentage

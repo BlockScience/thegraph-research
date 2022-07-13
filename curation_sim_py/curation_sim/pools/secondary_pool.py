@@ -45,6 +45,7 @@ class SecondaryPool:
   
     def _distributeShares(self, shares: NUMERIC_t):
         if self.totalDeposits > 0:
+            # for allocative efficiency
             self.accSharesPerDeposit += (shares/self.totalDeposits)
         else:
             self.shareToken.burn(self.address, shares)
@@ -57,6 +58,7 @@ class SecondaryPool:
     def _claim(self, account: ADDRESS_t):
         prevSnapshot = self.snapshotOf(account)
         prevDeposit = prevSnapshot.deposit
+
         # Distribute accumulated shares
         accShares = (self.accSharesPerDeposit - prevSnapshot.accSharesPerDeposit) * prevDeposit
         self.shareToken.transfer(self.address, account, accShares)
@@ -71,7 +73,7 @@ class SecondaryPool:
             deposit=prevSnapshot.deposit)
         self.snapshots[account] = newSnapshot
   
-    def snapshotOf(self, account):
+    def snapshotOf(self, account: ADDRESS_t):
         # This accounts for users that haven't been snapshotted but had a genesis deposit or have never had a deposit
         return self.snapshots.get(account,
                                   (SPSnapShot(deposit=self.primaryPool.depositOf(account),
