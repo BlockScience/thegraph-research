@@ -10,7 +10,7 @@ class PrimaryPool(ABC):
         pass
 
     @abstractmethod
-    def withdraw(self, context: Context):
+    def withdraw(self, account: ADDRESS_t, amount: NUMERIC_t):
         pass
 
     @abstractmethod

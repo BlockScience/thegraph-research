@@ -2,6 +2,8 @@ from dataclasses import dataclass
 import logging
 from typing import List, Tuple, Callable, Dict, Any
 
+import numpy.random as nrand
+
 from curation_sim.pools.curation_pool import CurationPool
 from curation_sim.pools.token import Token
 from curation_sim.pools.chain import Chain
@@ -63,3 +65,21 @@ def simulate3(actions: List[Action],
             log.append({'action': action,
                         'state': recordState(state)})
     return log
+
+
+def get_stakers(num_stakers: int,
+                mean: int,
+                std: int) -> List[Tuple[str, int]]:
+    found = False
+    while not found:
+        ret = [(f'curator{i}', int(nrand.normal(mean, std))) for i in range(num_stakers)]
+        if all(i[1] >= 0 for i in ret):
+            found = True
+    return ret
+
+
+def get_positive_normal(mean: NUMERIC_t, std: NUMERIC_t):
+    ret = int(nrand.normal(mean, std))
+    while ret < 0:
+        ret = int(nrand.normal(mean, std))
+    return ret

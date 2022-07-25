@@ -1,0 +1,11 @@
+name: curation-env
+
+dependencies:
+  - python=3.9
+  - numpy
+  - scipy
+  - matplotlib
+  - ipython
+  - jupyter
+  - pandas
+  - pip

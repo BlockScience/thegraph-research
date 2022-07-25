@@ -40,7 +40,7 @@ scenario_2_config = Config(
 )
 
 chain = Chain()
-reserveToken = Token(initialBalances={k: v for (k, v) in scenario_2_config.initialReserveTokenBalances})
+reserveToken = Token(initialBalances=scenario_2_config.initialReserveTokenBalances)
 
 curationPool = CurationPool(
       address='curationPool',

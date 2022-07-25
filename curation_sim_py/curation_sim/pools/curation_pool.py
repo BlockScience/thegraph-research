@@ -26,7 +26,7 @@ class CurationPool(PrimaryPool):
                  issuanceRate: float = 0,
                  valuationMultiple: NUMERIC_t = 1):
   
-        if sum(y for x, y in initialDeposits) != reserveToken.balanceOf(address):
+        if sum(y for _, y in initialDeposits) != reserveToken.balanceOf(address):
             raise AssertionError("CurationPool_constructor: Deposit balances must sum to pools token balance")
 
         # A Snapshot in the primary pool is an object with the following fields:
@@ -35,7 +35,7 @@ class CurationPool(PrimaryPool):
 
         self.snapshots: Dict[ADDRESS_t, PPSnapShot] = {}
         self.issuanceRate: NUMERIC_t = issuanceRate
-        self.shareToken: Token = share_token_cls(initialBalances={k: v for (k, v) in initialShareBalances})
+        self.shareToken: Token = share_token_cls(initialShareBalances)
         self.deposits: Dict[ADDRESS_t, NUMERIC_t] = {k: v for k, v in initialDeposits}
         self.chain: Chain = chain
         self.address: ADDRESS_t = address
@@ -70,16 +70,16 @@ class CurationPool(PrimaryPool):
         self.secondaryPool._updateDeposit(fromAccount, self.depositOf(fromAccount))
 
     # Users can withdraw reserves without burning their shares.
-    def withdraw(self, context: Context):
-        if self.depositOf(context.toAccount) < context.amount:
+    def withdraw(self, toAccount: ADDRESS_t, amount: NUMERIC_t):
+        if self.depositOf(toAccount) < amount:
             raise AssertionError("CurationPool_withdraw: User cannot withdraw more than they have deposited")
       
-        self.deposits[context.toAccount] = self.depositOf(context.toAccount) - context.amount
-        self.reserveToken.transfer(context.fromAccount, context.toAccount, context.amount)
+        self.deposits[toAccount] = self.depositOf(toAccount) - amount
+        self.reserveToken.transfer(self.address, toAccount, amount)
 
         # Must claim royalties and new shares before updating deposits in the secondary pool.
-        self.claim(context.toAccount)
-        self.secondaryPool._updateDeposit(context.toAccount, self.depositOf(context.toAccount))
+        self.claim(toAccount)
+        self.secondaryPool._updateDeposit(toAccount, self.depositOf(toAccount))
 
     # Allows a user to buy newly minted shares by paying the self-assessed value of those shares.
     def buyShares(self, account: ADDRESS_t, shares: NUMERIC_t):

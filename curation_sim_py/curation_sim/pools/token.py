@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Dict
+from typing import Dict, List, Tuple
 
 from curation_sim.pools.utils import Context, ADDRESS_t, NUMERIC_t
 
@@ -18,8 +18,8 @@ def update_context(context, **kwargs):
 
 
 class Token:
-    def __init__(self, initialBalances: Dict[ADDRESS_t, NUMERIC_t]):
-        self.balances: Dict[ADDRESS_t, NUMERIC_t] = copy.deepcopy(initialBalances)
+    def __init__(self, initialBalances: List[Tuple[ADDRESS_t, NUMERIC_t]]):
+        self.balances: Dict[ADDRESS_t, NUMERIC_t] = {k: v for (k, v) in initialBalances}
         self.totalSupply: NUMERIC_t = self._computeTotalSupply()
         self.hooks = {'preTransfer': [],
                       'postTransfer': [],
