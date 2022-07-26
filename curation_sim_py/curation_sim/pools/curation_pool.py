@@ -17,7 +17,7 @@ class PPSnapShot:
 class CurationPool(PrimaryPool):
     def __init__(self,
                  address: ADDRESS_t,
-                 initialShareBalances: List[Tuple[ADDRESS_t, NUMERIC_t]],
+                 initialShareBalances: Dict[ADDRESS_t, NUMERIC_t],
                  initialDeposits: List[Tuple[ADDRESS_t, NUMERIC_t]],
                  chain: Chain,
                  reserveToken: Token,

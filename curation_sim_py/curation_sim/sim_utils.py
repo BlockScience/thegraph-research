@@ -20,19 +20,19 @@ class Action:
 
 
 @dataclass
+class State:
+    chain: Chain
+    reserveToken: Token
+    curationPool: CurationPool
+
+
+@dataclass
 class Config:
     initialReserveTokenBalances: List[Tuple[ADDRESS_t, NUMERIC_t]]
     initialShareBalances: List[Tuple[ADDRESS_t, NUMERIC_t]]
     initialDeposits: List[Tuple[ADDRESS_t, NUMERIC_t]]
     actions: List[Action]
-    recordState: Callable[[Token, CurationPool], Dict]
-
-
-@dataclass
-class State:
-    chain: Chain
-    reserveToken: Token
-    curationPool: CurationPool
+    recordState: Callable[[State], Dict]
 
 
 def snake_to_camel(s: str):
@@ -45,7 +45,8 @@ def snake_to_camel(s: str):
 
 def simulate3(actions: List[Action],
               state: State,
-              recordState: Callable[[State], Dict[str, Any]]):
+              recordState: Callable[[State], Dict[str, Any]],
+              catch_errors: bool = False):
 
     log = [{'action': {'action_type': 'INITIAL_STATE'},
             'state': recordState(state)}]
@@ -59,11 +60,13 @@ def simulate3(actions: List[Action],
 
             log.append({'action': action,
                         'state': recordState(state)})
-
         except Exception as e:
-            _log.error(e)
-            log.append({'action': action,
-                        'state': recordState(state)})
+            if not catch_errors:
+                raise e
+            else:
+                _log.error(e)
+                log.append({'action': action,
+                            'state': recordState(state)})
     return log
 
 
@@ -71,6 +74,7 @@ def get_stakers(num_stakers: int,
                 mean: int,
                 std: int) -> List[Tuple[str, int]]:
     found = False
+    ret = []
     while not found:
         ret = [(f'curator{i}', int(nrand.normal(mean, std))) for i in range(num_stakers)]
         if all(i[1] >= 0 for i in ret):

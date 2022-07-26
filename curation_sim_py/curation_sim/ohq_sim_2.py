@@ -40,14 +40,14 @@ scenario_2_config = Config(
 )
 
 chain = Chain()
-reserveToken = Token(initialBalances=scenario_2_config.initialReserveTokenBalances)
+reserveToken = Token(initialBalances={k: v for k, v in scenario_2_config.initialReserveTokenBalances})
 
 curationPool = CurationPool(
       address='curationPool',
       reserveToken=reserveToken,
       secondary_pool_cls=SecondaryPool,
       chain=chain,
-      initialShareBalances=scenario_2_config.initialShareBalances,
+      initialShareBalances={k: v for k, v in scenario_2_config.initialShareBalances},
       initialDeposits=scenario_2_config.initialDeposits,
       issuanceRate=0.0001)
 

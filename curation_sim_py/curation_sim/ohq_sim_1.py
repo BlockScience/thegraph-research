@@ -64,7 +64,7 @@ curationPool = CurationPool(
       reserveToken=reserveToken,
       secondary_pool_cls=SecondaryPool,
       chain=chain,
-      initialShareBalances=scenario_1_config.initialShareBalances,
+      initialShareBalances={k: v for k, v in scenario_1_config.initialShareBalances},
       initialDeposits=scenario_1_config.initialDeposits,
       issuanceRate=0.0001)
 

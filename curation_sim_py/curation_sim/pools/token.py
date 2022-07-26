@@ -18,8 +18,8 @@ def update_context(context, **kwargs):
 
 
 class Token:
-    def __init__(self, initialBalances: List[Tuple[ADDRESS_t, NUMERIC_t]]):
-        self.balances: Dict[ADDRESS_t, NUMERIC_t] = {k: v for (k, v) in initialBalances}
+    def __init__(self, initialBalances: Dict[ADDRESS_t, NUMERIC_t]):
+        self.balances: Dict[ADDRESS_t, NUMERIC_t] = copy.deepcopy(initialBalances)
         self.totalSupply: NUMERIC_t = self._computeTotalSupply()
         self.hooks = {'preTransfer': [],
                       'postTransfer': [],
@@ -74,7 +74,11 @@ class Token:
 
     def _executeTransfer(self, context: Context):
         self.balances[context.fromAccount] = context.senderInitialBalance - context.amount
+        assert self.balances[context.fromAccount] >= 0
+
         self.balances[context.toAccount] = context.receiverInitialBalance + context.amount
+        assert self.balances[context.toAccount] >= 0
+
         return context
 
     def _postTransfer(self, context: Context):
@@ -132,7 +136,11 @@ class Token:
 
     def _executeBurn(self, context: Context):
         self.balances[context.fromAccount] = context.senderInitialBalance - context.amount
+        assert self.balances[context.fromAccount] >= 0
+
         self.totalSupply -= context.amount
+        assert self.totalSupply >= 0
+
         return context
 
     def _postBurn(self, context: Context):
