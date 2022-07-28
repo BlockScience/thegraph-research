@@ -56,13 +56,17 @@ class CurationPool(PrimaryPool):
   
     # Users can deposit reserves, without buying shares. These are principal-protected
     def deposit(self, fromAccount: ADDRESS_t, amount: NUMERIC_t):
+        """user deposits an amount of reserve token into the curation pool."""
+
         if self.reserveToken.balanceOf(fromAccount) < amount:
             raise AssertionError("CurationPool_deposit: User has insufficient funds")
 
         # Must claim royalties and new shares from secondary pool before updating deposits
         self.claim(fromAccount)
 
+        # the funds are moved from their account to the account of the curation pool
         self.reserveToken.transfer(fromAccount, self.address, amount)
+        # the new funds are assigned to the depositor in the internal accounting of the curation pool
         self.deposits[fromAccount] = self.depositOf(fromAccount) + amount
 
         # Deposits in the primary pool behave like shares in the secondary pool. The secondary pool

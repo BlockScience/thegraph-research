@@ -58,7 +58,7 @@ def simulate3(actions: List[Action],
             # perform action
             getattr(actor, method_name)(*action.args)
 
-            log.append({'action': action,
+            log.append({'action': {'action_type': action.action_type},
                         'state': recordState(state)})
         except Exception as e:
             if not catch_errors:

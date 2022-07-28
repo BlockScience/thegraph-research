@@ -49,5 +49,5 @@ you are paying at 100% dilution, the entire amount of GRT. it is like a marketin
 - indexers can change the percentage they give delegators without notice. three states of delegated tokens.
 
 
-Withdrawl from the secondary pool should reduce the total deposited amount of share tokens. The reserve token is withdrawn,
+Withdrawal from the secondary pool should reduce the total deposited amount of share tokens. The reserve token is withdrawn,
 naturally, along with the share token.

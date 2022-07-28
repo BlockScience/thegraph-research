@@ -36,7 +36,7 @@ class SecondaryPool:
         self.primaryPool: PrimaryPool = primaryPool
   
     # Updates deposits without claiming accumulated royalties or shares
-    def _updateDeposit(self, account: ADDRESS_t, amount: float):
+    def _updateDeposit(self, account: ADDRESS_t, amount: NUMERIC_t):
         prevDeposit = self.snapshotOf(account).deposit
         self.snapshots[account] = SPSnapShot(accSharesPerDeposit=self.accSharesPerDeposit,
                                              accRoyaltiesPerDeposit=self.accRoyaltiesPerDeposit,
@@ -61,6 +61,7 @@ class SecondaryPool:
 
         # Distribute accumulated shares
         accShares = (self.accSharesPerDeposit - prevSnapshot.accSharesPerDeposit) * prevDeposit
+        print(account, accShares)
         self.shareToken.transfer(self.address, account, accShares)
 
         # Distribute accumulated royalties
