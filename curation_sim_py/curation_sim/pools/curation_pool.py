@@ -105,6 +105,7 @@ class CurationPool(PrimaryPool):
   
     # Claims royalties for a user's shares in the primary pool. Does not touch secondary pool directly
     def _claim(self, account: ADDRESS_t):
+
         prevSnapshot = self.snapshotsOf(account)
         owedRoyalties = (self.accRoyaltiesPerShare - prevSnapshot.accRoyaltiesPerShare) * prevSnapshot.shares
           
@@ -154,4 +155,5 @@ class CurationPool(PrimaryPool):
 
     @property
     def totalShares(self):
-        return self.shareToken.totalSupply * (1 + self.issuanceRate)**(self.chain.blockHeight - self.lastMintedBlock)
+        # return self.shareToken.totalSupply * (1 + self.issuanceRate)**(self.chain.blockHeight - self.lastMintedBlock)
+        return self.shareToken.totalSupply * (1 + self.issuanceRate*(self.chain.blockHeight - self.lastMintedBlock))

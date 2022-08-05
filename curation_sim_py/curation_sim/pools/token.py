@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict
 
 from curation_sim.pools.utils import Context, ADDRESS_t, NUMERIC_t
 

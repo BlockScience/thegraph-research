@@ -138,3 +138,9 @@ package-lock.json
 # pycharm
 */.idea/*
 .idea
+
+# images
+*.png
+
+# mac cache
+.DS_Store
