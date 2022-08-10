@@ -155,5 +155,4 @@ class CurationPool(PrimaryPool):
 
     @property
     def totalShares(self):
-        # return self.shareToken.totalSupply * (1 + self.issuanceRate)**(self.chain.blockHeight - self.lastMintedBlock)
-        return self.shareToken.totalSupply * (1 + self.issuanceRate*(self.chain.blockHeight - self.lastMintedBlock))
+        return self.shareToken.totalSupply * (1 + self.issuanceRate)**(self.chain.blockHeight - self.lastMintedBlock)

@@ -173,19 +173,54 @@ axs[idx+3].plot(curator_shares, '.')
 axs[idx+4].set_title('secondary pool total deposits')
 axs[idx+4].plot(np.array(spool_total), '.')
 
-print(whale_shares)
-print(curator_shares)
-print(ratio)
 
 
-f.tight_layout()
-plt.show()
+
 
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.plot(whale_deposit, label='whale deposit')
-ax.plot([i/10 for i in curator_deposits], label='average non-whale curator deposit')
+avg_curator_deposit = [i/10 for i in curator_deposits]
+ax.plot(avg_curator_deposit, label='average non-whale curator deposit')
 ax.set_xlabel('time (a.u.)')
 ax.set_xticklabels([])
 ax.legend()
 fig.suptitle('Reserve token deposits')
 fig.savefig('curation_sim_deposits.png')
+
+
+
+print(whale_shares)
+print(curator_shares)
+print(ratio)
+
+fig, axs = plt.subplots(3, 1, figsize=(10, 5))
+axs[0].plot(whale_shares, label='whale shares')
+axs[0].set_title('Whale shares')
+axs[1].plot([i/NUM_STAKERS for i in curator_shares], label='average curator shares')
+axs[1].set_title('Average curator shares')
+
+axs[2].plot(ratio, label='ratio between share holdings of the whale and average holdings of the curators')
+axs[2].set_title('ratio between share holdings of the whale and average holdings of the curators')
+for ax in axs:
+    ax.set_xticks([])
+
+ax.set_xlabel('time (a.u.)')
+ax.set_xticklabels([])
+# ax.legend()
+fig.suptitle('Shares held by curators')
+plt.tight_layout()
+fig.savefig('whale_shares.png')
+
+fig, axs = plt.subplots(2, 1)
+axs[0].plot(ratio, '.')
+
+
+def ldiv(l0, l1):
+    return [i / j for i, j in zip(l0, l1)]
+
+
+# deposit_ratio = ldiv(whale_deposit, avg_curator_deposit)
+# axs[1].plot(ldiv(deposit_ratio, ratio), '.')
+
+f.tight_layout()
+plt.show()
