@@ -211,16 +211,6 @@ fig.suptitle('Shares held by curators')
 plt.tight_layout()
 fig.savefig('whale_shares.png')
 
-fig, axs = plt.subplots(2, 1)
-axs[0].plot(ratio, '.')
-
-
-def ldiv(l0, l1):
-    return [i / j for i, j in zip(l0, l1)]
-
-
-# deposit_ratio = ldiv(whale_deposit, avg_curator_deposit)
-# axs[1].plot(ldiv(deposit_ratio, ratio), '.')
 
 f.tight_layout()
 plt.show()
