@@ -144,3 +144,6 @@ package-lock.json
 
 # mac cache
 .DS_Store
+
+# dumped data
+*.pkl

@@ -1,7 +1,13 @@
 """
+In this simulation we assume a collection of curators interrupted by the appearance of a large depositer, the so-called
+whale. This large deposit confers upon the whale the right to accrue shares at a proportional rate, which is fair and
+indicative of allocative efficiency. However, when the whale withdraws their stake, there is a lag during which they
+continue to receive query fees (though not newly minted shares). This scenario is studied here.
 """
 import copy
 from functools import reduce
+import os
+import pickle
 import pprint
 from typing import List, Tuple, Optional
 
@@ -16,17 +22,28 @@ from curation_sim.pools.chain import Chain
 from curation_sim.sim_utils import Config, State, Action, simulate3, get_stakers, get_positive_normal
 
 
+# A population of curators with intentions to remain staked.
 NUM_STAKERS = 10
+# A group of special curators who engage in speculative behavior.
+WHALE_DEPOSIT = 40_000
+SPECIFIC_CURATORS: Tuple[str] = ('whale',)
+
+# parameters for the time evolution of the system.
 WAIT_PERIODS = 20
 BLOCKS_PER_PERIOD = 1000
-specific_curators = ('whale', )
-actions = []
+
+# The actions called on the state machine during its evolution.
+sim_actions = []
 
 
 def advance_actions(actions: List[Action],
                     time: int,
                     num_curators: int,
                     specific_curators: Optional[Tuple[str]] = None):
+    """
+    Advance the state machine during a time when no explicit changes are made. These actions
+    should represent passive time evolution.
+    """
     for i in range(num_curators):
         a = Action(action_type='CLAIM', target='curationPool', args=[f'curator{i}'])
         actions.append(a)
@@ -35,20 +52,25 @@ def advance_actions(actions: List[Action],
     actions.append(Action(action_type='SLEEP', target='chain', args=[time]))
 
 
+# prime the system.
 for _ in range(WAIT_PERIODS):
-    advance_actions(actions, BLOCKS_PER_PERIOD, NUM_STAKERS, specific_curators)
+    advance_actions(sim_actions, BLOCKS_PER_PERIOD, NUM_STAKERS, SPECIFIC_CURATORS)
 
-WHALE_DEPOSIT = 40_000
-actions += [Action(action_type='DEPOSIT', target='curationPool', args=['whale', WHALE_DEPOSIT])]
+# the whale deposits
+sim_actions += [Action(action_type='DEPOSIT', target='curationPool', args=['whale', WHALE_DEPOSIT])]
 
+# time evolution
 for _ in range(3*WAIT_PERIODS):
-    advance_actions(actions, BLOCKS_PER_PERIOD, NUM_STAKERS, specific_curators)
+    advance_actions(sim_actions, BLOCKS_PER_PERIOD, NUM_STAKERS, SPECIFIC_CURATORS)
 
-actions += [Action(action_type='WITHDRAW', target='curationPool', args=['whale', 10_000 + WHALE_DEPOSIT])]
+# the whale withdraws
+sim_actions += [Action(action_type='WITHDRAW', target='curationPool', args=['whale', 10_000 + WHALE_DEPOSIT])]
 
+# time evolution
 for _ in range(2*WAIT_PERIODS):
-    advance_actions(actions, BLOCKS_PER_PERIOD, NUM_STAKERS, specific_curators)
+    advance_actions(sim_actions, BLOCKS_PER_PERIOD, NUM_STAKERS, SPECIFIC_CURATORS)
 
+# initial conditions
 deposits_share_balances = [('whale', 10_000)] + get_stakers(num_stakers=NUM_STAKERS, mean=10_000, std=1_000)
 
 
@@ -58,7 +80,7 @@ scenario_1_config = Config(
     ] + get_stakers(num_stakers=NUM_STAKERS, mean=1_000, std=100),
     initialShareBalances=deposits_share_balances,
     initialDeposits=deposits_share_balances,
-    actions=actions,
+    actions=sim_actions,
     recordState=lambda state: {
         'time': copy.deepcopy(chain.blockHeight),
         'shareBalances': copy.deepcopy(state.curationPool.shareToken.balances),
@@ -111,21 +133,16 @@ ratio = [i['state']['whale_to_curators_shareRatio'] for i in sleep_actions]
 total_shares = [i['state']['totalShares'] for i in sleep_actions]
 
 
-idx = -1
-num_plots = 5 + idx
+# Produce and save some figures
+f, axs = plt.subplots(4, 1)
 
-f, axs = plt.subplots(num_plots, 1)
-# axs[idx+0].set_title('whale deposit in curation pool')
-# axs[idx+0].plot(whale_deposit, '.')
+#### FIGURE ONE ####
+axs[0].set_title('ratio of whale shares to average curator shares')
+axs[0].plot(ratio, '.')
 
-# axs[1].set_title('total non-whale curator deposits in curation pool')
-# axs[1].plot(curator_deposits, '.')
-
-axs[idx+1].set_title('ratio of whale shares to average curator shares')
-axs[idx+1].plot(ratio, '.')
-
-x_offset = 80 * WAIT_PERIODS // 20
-ys = np.array(ratio[x_offset:])
+# attempt an exponential fit to the ring-up
+x_offset_ringup = 80 * WAIT_PERIODS // 20
+ys = np.array(ratio[x_offset_ringup:])
 xs = np.array(range(len(ys)))
 vec_shape = (len(xs), 1)
 
@@ -135,18 +152,19 @@ xs = xs.reshape(vec_shape)
 A = np.concatenate([np.ones(vec_shape), xs], axis=1)
 log_a, b = reduce(np.dot, (np.linalg.inv(np.dot(A.T, A)), A.T, np.log(ys)))
 yhat = np.exp(log_a + b * xs)
-axs[idx+1].plot(range(x_offset, x_offset+len(xs)), yhat, 'x')
+axs[0].plot(range(x_offset_ringup, x_offset_ringup + len(xs)), yhat, 'x')
 
 print(abs(b) / BLOCKS_PER_PERIOD)
 
-
-x_offset_other = 20 * WAIT_PERIODS // 20
-ys = np.array(ratio[x_offset_other:x_offset])
+# attempt an exponential fit to the ring-down
+x_offset_ringdown = 20 * WAIT_PERIODS // 20
+ys = np.array(ratio[x_offset_ringdown:x_offset_ringup])
 xs = np.array(range(len(ys)))
 vec_shape = (len(xs), 1)
 
 ys = ys.reshape(vec_shape)
 xs = xs.reshape(vec_shape)
+
 
 def opt(x):
     a, b, c = x
@@ -157,25 +175,32 @@ def opt(x):
 val = scipy.optimize.fmin(opt, [5, 4.1, -.08])
 a, b, c = val
 yhat = a - b * np.exp(c*xs)
-print(a,b,c)
+print(a, b, c)
 
 r_rate = 1e-4 * BLOCKS_PER_PERIOD
-axs[idx+1].plot(range(x_offset_other, x_offset_other+len(xs)), yhat, 'x')
+axs[0].plot(range(x_offset_ringdown, x_offset_ringdown + len(xs)), yhat, 'x')
 
 print(abs(c) / BLOCKS_PER_PERIOD)
 
-axs[idx+2].set_title('whale share tokens')
-axs[idx+2].plot(whale_shares, '.')
+#### FIGURE TWO ####
 
-axs[idx+3].set_title('total non-whale curator share tokens')
-axs[idx+3].plot(curator_shares, '.')
-
-axs[idx+4].set_title('secondary pool total deposits')
-axs[idx+4].plot(np.array(spool_total), '.')
+axs[1].set_title('whale share tokens')
+axs[1].plot(whale_shares, '.')
 
 
+#### FIGURE THREE ####
+
+axs[2].set_title('total non-whale curator share tokens')
+axs[2].plot(curator_shares, '.')
 
 
+#### FIGURE FOUR ####
+
+axs[3].set_title('secondary pool total deposits')
+axs[3].plot(np.array(spool_total), '.')
+
+
+#### SAVED FIGURE ONE ####
 
 fig, ax = plt.subplots(figsize=(10, 5))
 ax.plot(whale_deposit, label='whale deposit')
@@ -188,10 +213,7 @@ fig.suptitle('Reserve token deposits')
 fig.savefig('curation_sim_deposits.png')
 
 
-
-print(whale_shares)
-print(curator_shares)
-print(ratio)
+#### SAVED FIGURE TWO ####
 
 fig, axs = plt.subplots(3, 1, figsize=(10, 5))
 axs[0].plot(whale_shares, label='whale shares')
@@ -206,7 +228,6 @@ for ax in axs:
 
 ax.set_xlabel('time (a.u.)')
 ax.set_xticklabels([])
-# ax.legend()
 fig.suptitle('Shares held by curators')
 plt.tight_layout()
 fig.savefig('whale_shares.png')
@@ -214,3 +235,14 @@ fig.savefig('whale_shares.png')
 
 f.tight_layout()
 plt.show()
+
+# output some useful quantities for further modelling
+
+pwd = os.path.dirname(os.path.abspath(__file__))
+savedir = os.path.join(pwd, 'notebooks')
+with open(os.path.join(savedir, 'whale_shares.pkl'), 'wb') as f:
+    pickle.dump(whale_shares, f)
+with open(os.path.join(savedir, 'curator_shares.pkl'), 'wb') as f:
+    pickle.dump(curator_shares, f)
+with open(os.path.join(savedir, 'ratio.pkl'), 'wb') as f:
+    pickle.dump(ratio, f)
