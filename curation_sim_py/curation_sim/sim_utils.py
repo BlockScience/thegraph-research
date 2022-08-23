@@ -3,6 +3,7 @@ import logging
 from typing import List, Tuple, Callable, Dict, Any
 
 import numpy.random as nrand
+import pprint
 
 from curation_sim.pools.curation_pool import CurationPool
 from curation_sim.pools.token import Token
@@ -46,12 +47,19 @@ def snake_to_camel(s: str):
 def simulate3(actions: List[Action],
               state: State,
               recordState: Callable[[State], Dict[str, Any]],
-              catch_errors: bool = False):
+              *,
+              catch_errors: bool = False,
+              verbose: bool = False) -> List[Dict]:
 
     log = [{'action': {'action_type': 'INITIAL_STATE'},
             'state': recordState(state)}]
 
+    p_printer = pprint.PrettyPrinter()
+    if verbose:
+        p_printer.pprint(log[-1])
+
     for action in actions:
+
         try:
             method_name = snake_to_camel(action.action_type)
             actor = getattr(state, action.target)
@@ -67,6 +75,10 @@ def simulate3(actions: List[Action],
                 _log.error(e)
                 log.append({'action': action,
                             'state': recordState(state)})
+
+        if verbose:
+            p_printer.pprint(log[-1])
+
     return log
 
 
