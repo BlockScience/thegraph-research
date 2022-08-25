@@ -31,6 +31,13 @@ WAIT_PERIODS = 10
 BLOCKS_PER_PERIOD = 100
 
 
+@dataclass
+class PoolConfig:
+    issuance_rate: float
+    deposit_std: int
+    reserve_std: int
+
+
 def advance_actions(actions: List[Action],
                     time: int,
                     num_curators: int,
@@ -60,13 +67,13 @@ def get_actions(share_drive: Dict[int, int], max_time: int) -> List[Action]:
     return sim_actions
 
 
-def get_sim_config(actions: List[Action], chain: Chain) -> Config:
+def get_sim_config(pool_config: PoolConfig, actions: List[Action], chain: Chain) -> Config:
     # initial conditions
-    deposits_share_balances = [('market', 0)] + get_stakers(num_stakers=NUM_STAKERS, mean=10_000, std=1_000)
+    deposits_share_balances = [('market', 0)] + get_stakers(num_stakers=NUM_STAKERS, mean=10_000, std=pool_config.deposit_std)
     config = Config(
         initialReserveTokenBalances=[
                                         ('curationPool', sum(i[1] for i in deposits_share_balances)), ('market', 100_000)
-                                    ] + get_stakers(num_stakers=NUM_STAKERS, mean=1_000, std=100),
+                                    ] + get_stakers(num_stakers=NUM_STAKERS, mean=1_000, std=pool_config.reserve_std),
         initialShareBalances=deposits_share_balances,
         initialDeposits=deposits_share_balances,
         actions=actions,
@@ -83,15 +90,10 @@ def get_sim_config(actions: List[Action], chain: Chain) -> Config:
     return config
 
 
-@dataclass
-class PoolConfig:
-    issuance_rate: float
-
-
 def run_simulation(pool_config: PoolConfig, share_drive: Dict[int, int], max_time: int) -> List[Dict]:
     assert max_time * WAIT_PERIODS > max(share_drive)
     chain = Chain()
-    sim_config = get_sim_config(get_actions(share_drive, max_time), chain)
+    sim_config = get_sim_config(pool_config, get_actions(share_drive, max_time), chain)
     reserveToken = Token({k: v for k, v in sim_config.initialReserveTokenBalances})
 
     curationPool = CurationPool(
@@ -114,23 +116,24 @@ def run_simulation(pool_config: PoolConfig, share_drive: Dict[int, int], max_tim
     return sim_result
 
 
-def process_result(result: List[Dict]):
+@dataclass
+class ProcessedSim:
+    market_deposits: List
+    curator_deposits: List
+    market_shares: List
+    curator_shares: List
+    spool_total: List
+    total_shares: List
+    ratio: List = None
+
+    def __post_init__(self):
+        self.ratio = [i/j for i, j in zip(self.curator_shares, self.total_shares)]
+
+
+def process_result(result: List[Dict]) -> ProcessedSim:
     sleep_actions = list(filter(lambda x: x['action']['action_type'] == 'SLEEP', result))
 
-    @dataclass
-    class Box:
-        market_deposits: List
-        curator_deposits: List
-        market_shares: List
-        curator_shares: List
-        spool_total: List
-        total_shares: List
-        ratio: List = None
-
-        def __post_init__(self):
-            self.ratio = [i/j for i, j in zip(self.curator_shares, self.total_shares)]
-
-    ret_box = Box(
+    ret = ProcessedSim(
         market_deposits=[i['state']['depositBalances']['market'] for i in sleep_actions],
         curator_deposits=[sum(i['state']['depositBalances'][f'curator{j}'] for j in range(NUM_STAKERS)) for i in sleep_actions],
         market_shares=[i['state']['shareBalances']['market'] for i in sleep_actions],
@@ -139,26 +142,23 @@ def process_result(result: List[Dict]):
         total_shares=[i['state']['totalShares'] for i in sleep_actions],
     )
 
-    return ret_box
+    return ret
 
 
-def run_and_process(pool_config, share_drive, max_time):
+def run_and_process(pool_config: PoolConfig, share_drive: Dict[int, int], max_time: int) -> ProcessedSim:
     return process_result(run_simulation(pool_config, share_drive, max_time))
 
 
 def do_step():
-    f, axs = plt.subplots(2, 1)
+    fig, axs = plt.subplots(2, 1, figsize=(15, 7))
 
     for r in (1e-4, 2e-4, 4e-4):
-        pool_config = PoolConfig(issuance_rate=r)
+        pool_config = PoolConfig(issuance_rate=r, deposit_std=1_000, reserve_std=100)
         result_obj = run_and_process(pool_config, {5: 100_000}, 15)
 
-        axs[0].plot(result_obj.total_shares, '.')
-        axs[0].set_yscale('log')
-        axs[0].set_title('total shares')
+        axs[0].plot(result_obj.total_shares, '.', label=f'r={1e4*r}E-4')
 
-        axs[1].plot(result_obj.ratio, '.')
-        axs[1].set_title('ratio of curator shares to total shares, eg curator share fraction')
+        axs[1].plot(result_obj.ratio, '.', label=f'r={1e4*r}E-4')
 
         ys = np.array(result_obj.ratio[5:])
         xs = np.array(range(len(ys)))
@@ -170,33 +170,101 @@ def do_step():
             yhat = model(a)
             return ((yhat-ys)**2).sum()
 
-        a = sopt.fmin(cost, [400000])
+        a = sopt.fmin(cost, [.2])
         print(a)
 
         yhat = model(a)
 
         axs[1].plot(range(5, 5 + len(yhat)), yhat)
 
+    axs[0].set_yscale('log')
+    axs[0].set_title('total shares over time with step change', fontsize=20)
+    axs[0].set_xticklabels([], fontsize=12)
+    plt.setp(axs[0].get_yticklabels(), fontsize=12)
+    axs[0].set_xticklabels([])
+    axs[0].set_xlabel('time (a.u.)', fontsize=15)
+    axs[0].set_ylabel('share number', fontsize=15)
+    axs[0].legend(fontsize=15)
+
+    axs[1].set_title('ratio of curator shares over time with step change', fontsize=20)
+    axs[1].set_xticklabels([], fontsize=12)
+    plt.setp(axs[1].get_yticklabels(), fontsize=12)
+    axs[1].set_xlabel('time (a.u.)', fontsize=15)
+    axs[1].set_ylabel('ratio of shares owned\nby active curators', fontsize=15)
+    axs[1].legend(fontsize=15)
+
     plt.tight_layout()
+    fig.savefig('step_share_drive.png')
+
     plt.show()
 
 
 def do_linear_ramp():
-    pool_config = PoolConfig(issuance_rate=0.0001)
-    result_obj = run_and_process(pool_config, {i: 1000 for i in range(10, 20)}, 8)
+    fig, axs = plt.subplots(1, 1, figsize=(15, 7))
+    axs = [axs]
 
-    # Produce and save some figures
-    f, axs = plt.subplots(2, 1)
+    r = 1e-4
+    pool_config = PoolConfig(issuance_rate=r, deposit_std=0, reserve_std=0)
+    for drive in ({5: 15_000, 6: 15_000},
+                  {k: 3_000 for k in range(5, 15)},
+                  {k: 1_000 for k in range(5, 35)},
+                  {k: 333.3333 for k in range(5, 95)}):
+        result_obj = run_and_process(pool_config, drive, 15)
 
-    axs[0].plot(result_obj.total_shares, '.')
-    axs[0].set_title('total shares')
+        if len(drive) > 10:
+            ys = np.array(result_obj.ratio[5:5+len(drive)])
+            xs = np.array(range(len(ys)))
+            model = lambda a, c: a + (1-a) * (1 + r) ** (-c * xs * BLOCKS_PER_PERIOD)
 
-    axs[1].plot(result_obj.ratio, '.')
-    axs[1].set_title('ratio of curator shares to total shares, eg curator share fraction')
+            def cost(params):
+                a, c = params
+                yhat = model(a, c)
+                return ((yhat - ys) ** 2).sum()
+
+            a, c = sopt.fmin(cost, [.2, .2])
+            yhat = model(a, c)
+            axs[0].plot(range(5, 5 + len(yhat)), yhat)
+
+        axs[0].plot(result_obj.ratio, '.', label=f'{len(drive)} steps')
+
+    axs[0].set_title('ratio of curator shares to total shares with linear ramps', fontsize=20)
+    axs[0].set_xticklabels([], fontsize=12)
+    plt.setp(axs[0].get_yticklabels(), fontsize=12)
+    axs[0].set_xlabel('time (a.u.)', fontsize=15)
+    axs[0].set_ylabel('ratio of shares owned by active curators', fontsize=15)
+    axs[0].legend(fontsize=15)
 
     plt.tight_layout()
+    fig.savefig('linear_share_drive.png')
+
+    plt.show()
+
+
+def do_sin_ramp():
+    fig, axs = plt.subplots(1, 1, figsize=(15, 7))
+    axs = [axs]
+
+    r = 1e-4
+    pool_config = PoolConfig(issuance_rate=r, deposit_std=1_000, reserve_std=100)
+    for nu in (11, 23, 59):
+        drive = {k: 100 * (1 + np.sin(nu * k)) for k in range(5, 105)}
+        result_obj = run_and_process(pool_config, drive, 15)
+        axs[0].plot(result_obj.ratio, '.', label=f'{nu} steps')
+
+    axs[0].set_title('ratio of curator shares to total shares with sinusoidal ramps', fontsize=20)
+    axs[0].set_xticklabels([], fontsize=12)
+    plt.setp(axs[0].get_yticklabels(), fontsize=12)
+    axs[0].set_xlabel('time (a.u.)', fontsize=15)
+    axs[0].set_ylabel('ratio of shares owned by active curators', fontsize=15)
+    axs[0].legend(fontsize=15)
+
+    plt.tight_layout()
+    fig.savefig('sin_share_drive.png')
+
     plt.show()
 
 
 if __name__ == '__main__':
-    do_step()
+    # do_step()
+    # do_linear_ramp()
+    do_sin_ramp()
