@@ -25,6 +25,20 @@ class CurationPool(PrimaryPool):
                  secondary_pool_cls: Type[SecondaryPool] = SecondaryPool,
                  issuanceRate: float = 0,
                  valuationMultiple: NUMERIC_t = 1):
+
+        """
+        :param address: the network address of the curation pool, or any suitable identifier.
+        :param initialShareBalances: the shares  owned by each curator when the curation pool is instantiated.
+        :param initialDeposits: the amount of reserve token deposited by each curator when the curation pool is
+               instantiated. this amount is owned by the curation pool itself, but is accounted to each curator by logic
+               internal to the curation pool.
+        :param chain: the chain on which the curation pool lives.
+        :param reserveToken: the reserve token.
+        :param share_token_cls: the constructor for the share token.
+        :param secondary_pool_cls: the constructor for the secondary pool.
+        :param issuanceRate: the issuance rate r at which new reserve tokens are minted.
+        :param valuationMultiple: the personal valuation of shares by the curators.
+        """
   
         if sum(y for _, y in initialDeposits) != reserveToken.balanceOf(address):
             raise AssertionError("CurationPool_constructor: Deposit balances must sum to pools token balance")
@@ -48,6 +62,7 @@ class CurationPool(PrimaryPool):
             totalDeposits=self.reserveToken.balanceOf(self.address),
             primaryPool=self)
 
+        # a proxy for what time has passed.
         self.lastMintedBlock = chain.blockHeight
         # Defines the relationships between total deposits and the total self-assessed value of shares.
         # In theory, it makes sense for this to be related to the opportunity costs of deposits and the
