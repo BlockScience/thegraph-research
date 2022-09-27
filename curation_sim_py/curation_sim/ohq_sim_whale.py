@@ -19,7 +19,7 @@ from curation_sim.pools.curation_pool import CurationPool
 from curation_sim.pools.secondary_pool import SecondaryPool
 from curation_sim.pools.token import Token
 from curation_sim.pools.chain import Chain
-from curation_sim.sim_utils import Config, State, Action, simulate3, get_stakers, get_positive_normal
+from curation_sim.sim_utils import Config, State, Action, simulate3, get_stakers
 
 
 # A population of curators with intentions to remain staked.
@@ -82,7 +82,7 @@ scenario_1_config = Config(
     initialDeposits=deposits_share_balances,
     actions=sim_actions,
     recordState=lambda state: {
-        'time': copy.deepcopy(chain.blockHeight),
+        'time': copy.deepcopy(state.chain.blockHeight),
         'shareBalances': copy.deepcopy(state.curationPool.shareToken.balances),
         'depositBalances': copy.deepcopy(state.curationPool.deposits),
         'totalShares': state.curationPool.shareToken.balanceOf('whale') + sum(state.curationPool.shareToken.balanceOf(f'curator{i}') for i in range(NUM_STAKERS)),

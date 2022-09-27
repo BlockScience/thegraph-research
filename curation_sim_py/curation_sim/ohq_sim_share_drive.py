@@ -78,7 +78,7 @@ def get_sim_config(pool_config: PoolConfig, actions: List[Action], chain: Chain)
         initialDeposits=deposits_share_balances,
         actions=actions,
         recordState=lambda state: {
-            'time': copy.deepcopy(chain.blockHeight),
+            'time': copy.deepcopy(state.chain.blockHeight),
             'shareBalances': copy.deepcopy(state.curationPool.shareToken.balances),
             'depositBalances': copy.deepcopy(state.curationPool.deposits),
             'totalShares': state.curationPool.shareToken.balanceOf('market') + sum(state.curationPool.shareToken.balanceOf(f'curator{i}') for i in range(NUM_STAKERS)),
