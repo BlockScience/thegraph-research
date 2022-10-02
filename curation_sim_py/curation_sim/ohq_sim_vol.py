@@ -1,7 +1,8 @@
 import copy
-from typing import List, Tuple, Dict
 import random
+from typing import List, Dict
 
+import scipy.optimize as sopt
 from matplotlib import pyplot as plt
 
 from curation_sim.pools.chain import Chain
@@ -9,24 +10,35 @@ from curation_sim.pools.secondary_pool import SecondaryPool
 from curation_sim.pools.token import Token
 from curation_sim.sim_utils import Action, Config, State, simulate3, CurationPool
 
+# parameters for the time evolution of the system.
+WAIT_PERIODS = 1
+BLOCKS_PER_PERIOD = 7200
 
-# A population of curators who trade into and out of their position at random
+
+# A population of curators who trade into and out of their position at random.
+# the number of such traders.
 NUM_VOL_TRADERS: int = 20
+# the fraction of their wealth a trader will additionally purchase or withdraw.
 TRADE_FRACTION: float = 1.05
+# the probability a trader will deposit more grt.
 DEPOSIT_PROBABILITY: float = .2
+# the probability a trader will withdraw grt.
 WITHDRAW_PROBABILITY: float = .2
 
+# assert positive probability.
 # the remaining probability is to do nothing.
 assert DEPOSIT_PROBABILITY >= 0
 assert WITHDRAW_PROBABILITY >= 0
 assert DEPOSIT_PROBABILITY + WITHDRAW_PROBABILITY <= 1.0
 
+# the fraction of shares and number of shares owned by the principal curator.
 SENSIBLE_STARTING_FRACTION: float = .7
 SENSIBLE_STARTING_SHARES: float = 70000
 
-# parameters for the time evolution of the system.
-WAIT_PERIODS = 1
-BLOCKS_PER_PERIOD = 7200
+
+# the grt owned by each curator.
+TRADER_GRT = 1_000_000
+SENSIBLE_CURATOR_GRT = 10_000_000
 
 
 # The actions called on the state machine during its evolution.
@@ -34,22 +46,33 @@ sim_actions = []
 
 
 def advance_actions(actions: List[Action],
-                    time: int,
+                    sleep_time: int,
                     vol_trader_stakes: Dict[str, float],
+                    vol_trader_grt: Dict[str, float],
                     curator_stakes: Dict[str, float],
                     traders_active: bool):
     """
     Advance the state machine during a time when no explicit changes are made. These actions
     should represent passive time evolution.
+
+    :param actions: The list of actions.
+    :param sleep_time: The time to sleep.
+    :param vol_trader_stakes: The grt staked by each vol trader.
+    :param vol_trader_grt: The grt owned by each vol trader.
+    :param curator_stakes: The grt staked by each curator.
+    :param traders_active: Whether the traders are active.
     """
+
     if traders_active:
         for i in vol_trader_stakes:
             event_val = random.random()
             if event_val < DEPOSIT_PROBABILITY:
                 amnt_up = (TRADE_FRACTION - 1) * vol_trader_stakes[i]
-                a = Action(action_type='DEPOSIT', target='curationPool', args=[i, amnt_up])
-                actions.append(a)
-                vol_trader_stakes[i] += amnt_up
+                if amnt_up < vol_trader_grt[i]:
+                    a = Action(action_type='DEPOSIT', target='curationPool', args=[i, amnt_up])
+                    actions.append(a)
+                    vol_trader_stakes[i] += amnt_up
+                    vol_trader_grt[i] -= amnt_up
             elif DEPOSIT_PROBABILITY <= event_val < DEPOSIT_PROBABILITY + WITHDRAW_PROBABILITY:
                 amnt_down = vol_trader_stakes[i] * (1 - 1 / TRADE_FRACTION)
                 a = Action(action_type='WITHDRAW', target='curationPool', args=[i, amnt_down])
@@ -58,7 +81,7 @@ def advance_actions(actions: List[Action],
             else:
                 pass
 
-    for c in curator_grt:
+    for c in curator_stakes:
         amnt = 0 * curator_stakes[c]
         a = Action(action_type='DEPOSIT', target='curationPool', args=[c, amnt])
         actions.append(a)
@@ -69,24 +92,35 @@ def advance_actions(actions: List[Action],
         actions.append(a)
     for c in curator_stakes:
         actions.append(Action(action_type='CLAIM', target='curationPool', args=[c]))
-    actions.append(Action(action_type='SLEEP', target='chain', args=[time]))
+    actions.append(Action(action_type='SLEEP', target='chain', args=[sleep_time]))
 
 
-# trader GRT holdings
+# trader GRT holdings in the curation pool. assuming that the curators have a certain amount of grt that represents
+# a certain fraction of the overall stake, distribute the remaining staked grt across vol traders.
 trader_starting_grt: float = ((1 - SENSIBLE_STARTING_FRACTION) * SENSIBLE_STARTING_SHARES / SENSIBLE_STARTING_FRACTION) / NUM_VOL_TRADERS
-trader_grt: Dict[str, float] = {f'trader{t}': trader_starting_grt for t in range(NUM_VOL_TRADERS)}
+trader_stake: Dict[str, float] = {f'trader{t}': trader_starting_grt for t in range(NUM_VOL_TRADERS)}
+# personal trader GRT holdings outside
+trader_grt: Dict[str, float] = {f'trader{t}': TRADER_GRT for t in range(NUM_VOL_TRADERS)}
 
-curator_grt = {'sensible_curator': SENSIBLE_STARTING_SHARES}
+curator_stake = {'sensible_curator': SENSIBLE_STARTING_SHARES}
+
 
 # time evolution
+
+# prime the system.
+for _ in range(10):
+    advance_actions(sim_actions, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=False)
+
 for _ in range(200):
-    advance_actions(sim_actions, BLOCKS_PER_PERIOD, trader_grt, curator_grt, traders_active=True)
+    advance_actions(sim_actions, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=True)
 
 # initial conditions
-deposits_share_balances = [('sensible_curator', SENSIBLE_STARTING_SHARES)] + [(i, trader_starting_grt) for i in trader_grt]
+# the shares (also used as the stake) attributed to each participant.
+deposits_share_balances = [('sensible_curator', SENSIBLE_STARTING_SHARES)] + [(i, trader_starting_grt) for i in trader_stake]
+# the grt owned by each participant.
 initial_reserve_token_balances = [('curationPool', sum(i[1] for i in deposits_share_balances)),
-                                  ('sensible_curator', 100_000)
-                                  ] + [(i, 100_000) for i in trader_grt]
+                                  ('sensible_curator', SENSIBLE_CURATOR_GRT)
+                                  ] + [(i, TRADER_GRT) for i in trader_stake]
 
 scenario_config = Config(
     initialReserveTokenBalances=initial_reserve_token_balances,
@@ -124,6 +158,7 @@ sim_result = simulate3(scenario_config.actions,
                        scenario_config.recordState)
 
 
+# studies on the results.
 sleep_actions = list(filter(lambda x: x['action']['action_type'] == 'SLEEP', sim_result))
 
 stable_shares = [i['state']['shareBalances']['sensible_curator'] for i in sleep_actions]
@@ -134,6 +169,30 @@ stable_signal = [i['state']['depositBalances']['sensible_curator'] for i in slee
 total_signal = [sum(i['state']['depositBalances'].values()) for i in sleep_actions]
 sensible_deposit_fraction = [i / j for i, j in zip(stable_signal, total_signal)]
 
-plt.plot(sensible_deposit_fraction)
-plt.plot(sensible_share_fraction)
+
+def lowpass(x, a):
+    y = [x[0]]
+    for idx in range(1, len(sensible_share_fraction)):
+        y.append(a * y[idx-1] + (1-a) * x[idx])
+    return y
+
+
+def cost(x):
+    a = x[0]
+    y = lowpass(sensible_deposit_fraction, a)
+    return sum((i-j)**2 for i, j in zip(y, sensible_share_fraction))
+
+
+fig, axs = plt.subplots(figsize=(8, 6))
+
+axs.plot(sensible_deposit_fraction)
+axs.plot(sensible_share_fraction)
+result = sopt.fmin(cost, [.6])
+y = lowpass(sensible_deposit_fraction, result[0])
+axs.plot(y, '.')
+
+axs.set_xlabel('time (a.u.)', fontsize=15)
+axs.set_ylabel('ratio of shares owned by active curators', fontsize=15)
+axs.set_title('Cool')
+
 plt.show()

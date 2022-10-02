@@ -61,7 +61,7 @@ class Token:
         senderInitialBalance = context.senderInitialBalance
         amount = context.amount
         if senderInitialBalance < amount:
-            if (amount-senderInitialBalance) < 0.000001:  # // This addresses some Javascript math imprecision
+            if (amount-senderInitialBalance) < 1e-5:  # // This addresses some Javascript math imprecision
                 _log.info("Token_transfer: Rounding down amount to address precision issues")
                 _log.info(context)
                 amount = senderInitialBalance
@@ -74,7 +74,11 @@ class Token:
 
     def _executeTransfer(self, context: Context):
         self.balances[context.fromAccount] = context.senderInitialBalance - context.amount
-        assert self.balances[context.fromAccount] >= 0
+        if self.balances[context.fromAccount] < 0:
+            if abs(self.balances[context.fromAccount] / context.amount) < 1e-10:
+                self.balances[context.fromAccount] = 0
+            else:
+                raise
 
         self.balances[context.toAccount] = context.receiverInitialBalance + context.amount
         assert self.balances[context.toAccount] >= 0
