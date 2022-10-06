@@ -42,7 +42,7 @@ SENSIBLE_CURATOR_GRT = 10_000_000
 
 
 # The actions called on the state machine during its evolution.
-sim_actions = []
+sim_actions_basic = []
 
 
 def advance_actions(actions: List[Action],
@@ -109,10 +109,10 @@ curator_stake = {'sensible_curator': SENSIBLE_STARTING_SHARES}
 
 # prime the system.
 for _ in range(10):
-    advance_actions(sim_actions, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=False)
+    advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=False)
 
 for _ in range(200):
-    advance_actions(sim_actions, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=True)
+    advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=True)
 
 # initial conditions
 # the shares (also used as the stake) attributed to each participant.
@@ -126,7 +126,7 @@ scenario_config = Config(
     initialReserveTokenBalances=initial_reserve_token_balances,
     initialShareBalances=deposits_share_balances,
     initialDeposits=deposits_share_balances,
-    actions=sim_actions,
+    actions=sim_actions_basic,
     recordState=lambda s: {
         'time': copy.deepcopy(s.chain.blockHeight),
         'shareBalances': copy.deepcopy(s.curationPool.shareToken.balances),
@@ -172,27 +172,44 @@ sensible_deposit_fraction = [i / j for i, j in zip(stable_signal, total_signal)]
 
 def lowpass(x, a):
     y = [x[0]]
-    for idx in range(1, len(sensible_share_fraction)):
+    for idx in range(1, len(x)):
         y.append(a * y[idx-1] + (1-a) * x[idx])
     return y
 
 
-def cost(x):
+def ema(x, a):
+    num = [x[0]]
+    denom = [1]
+    for i in range(1, len(x)):
+        num.append(x[i] + a * num[i-1])
+        denom.append(denom[i-1] + a**i)
+    return [i/j for i, j in zip(num, denom)]
+
+
+def cost(x, f):
     a = x[0]
-    y = lowpass(sensible_deposit_fraction, a)
+    y = f(sensible_deposit_fraction, a)
     return sum((i-j)**2 for i, j in zip(y, sensible_share_fraction))
 
 
-fig, axs = plt.subplots(figsize=(8, 6))
+def basic_plot():
+    fig, axs = plt.subplots(figsize=(8, 6))
 
-axs.plot(sensible_deposit_fraction)
-axs.plot(sensible_share_fraction)
-result = sopt.fmin(cost, [.6])
-y = lowpass(sensible_deposit_fraction, result[0])
-axs.plot(y, '.')
+    axs.plot(sensible_deposit_fraction, label='grt fraction')
+    axs.plot(sensible_share_fraction, label='share fraction')
 
-axs.set_xlabel('time (a.u.)', fontsize=15)
-axs.set_ylabel('ratio of shares owned by active curators', fontsize=15)
-axs.set_title('Cool')
+    smoother = lowpass
+    result = sopt.fmin(lambda x: cost(x, smoother), [.6])
+    y = smoother(sensible_deposit_fraction, result[0])
+    axs.plot(y, label='lowpass', linewidth=3)
 
-plt.show()
+    axs.set_xlabel('time (a.u.)', fontsize=15)
+    axs.set_ylabel('ratio of shares and signal owned by active curators', fontsize=15)
+    axs.set_title('Curator Share Fraction in a Volatile Market', fontsize=20)
+    axs.legend(fontsize=15)
+    fig.savefig('curator_volatile_market.png')
+
+
+if __name__ == '__main__':
+    basic_plot()
+    plt.show()
