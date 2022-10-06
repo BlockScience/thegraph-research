@@ -2,6 +2,7 @@ import copy
 import random
 from typing import List, Dict
 
+import numpy as np
 import scipy.optimize as sopt
 from matplotlib import pyplot as plt
 
@@ -106,12 +107,14 @@ curator_stake = {'sensible_curator': SENSIBLE_STARTING_SHARES}
 
 
 # time evolution
+PRIME_TIME: int = 10
+SIM_TIME: int = 200
 
 # prime the system.
-for _ in range(10):
+for _ in range(PRIME_TIME):
     advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=False)
 
-for _ in range(200):
+for _ in range(SIM_TIME):
     advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=True)
 
 # initial conditions
@@ -153,46 +156,44 @@ state = State(chain,
               reserveToken,
               curationPool)
 
-sim_result = simulate3(scenario_config.actions,
-                       state,
-                       scenario_config.recordState)
-
-
-# studies on the results.
-sleep_actions = list(filter(lambda x: x['action']['action_type'] == 'SLEEP', sim_result))
-
-stable_shares = [i['state']['shareBalances']['sensible_curator'] for i in sleep_actions]
-total_shares = [sum(i['state']['shareBalances'].values()) for i in sleep_actions]
-sensible_share_fraction = [i / j for i, j in zip(stable_shares, total_shares)]
-
-stable_signal = [i['state']['depositBalances']['sensible_curator'] for i in sleep_actions]
-total_signal = [sum(i['state']['depositBalances'].values()) for i in sleep_actions]
-sensible_deposit_fraction = [i / j for i, j in zip(stable_signal, total_signal)]
-
-
-def lowpass(x, a):
-    y = [x[0]]
-    for idx in range(1, len(x)):
-        y.append(a * y[idx-1] + (1-a) * x[idx])
-    return y
-
-
-def ema(x, a):
-    num = [x[0]]
-    denom = [1]
-    for i in range(1, len(x)):
-        num.append(x[i] + a * num[i-1])
-        denom.append(denom[i-1] + a**i)
-    return [i/j for i, j in zip(num, denom)]
-
-
-def cost(x, f):
-    a = x[0]
-    y = f(sensible_deposit_fraction, a)
-    return sum((i-j)**2 for i, j in zip(y, sensible_share_fraction))
-
 
 def basic_plot():
+    sim_result = simulate3(scenario_config.actions,
+                           state,
+                           scenario_config.recordState)
+
+    # studies on the results.
+    sleep_actions = list(filter(lambda x: x['action']['action_type'] == 'SLEEP', sim_result))
+
+    stable_shares = [i['state']['shareBalances']['sensible_curator'] for i in sleep_actions]
+    total_shares = [sum(i['state']['shareBalances'].values()) for i in sleep_actions]
+    sensible_share_fraction = [i / j for i, j in zip(stable_shares, total_shares)]
+
+    stable_signal = [i['state']['depositBalances']['sensible_curator'] for i in sleep_actions]
+    trader_signal = [sum(i['state']['depositBalances'][f'trader{t}'] for t in range(NUM_VOL_TRADERS)) for i in sleep_actions]
+
+    total_signal = [sum(i['state']['depositBalances'].values()) for i in sleep_actions]
+    sensible_deposit_fraction = [i / j for i, j in zip(stable_signal, total_signal)]
+
+    def lowpass(x, a):
+        y = [x[0]]
+        for idx in range(1, len(x)):
+            y.append(a * y[idx - 1] + (1 - a) * x[idx])
+        return y
+
+    def ema(x, a):
+        num = [x[0]]
+        denom = [1]
+        for i in range(1, len(x)):
+            num.append(x[i] + a * num[i - 1])
+            denom.append(denom[i - 1] + a ** i)
+        return [i / j for i, j in zip(num, denom)]
+
+    def cost(x, f):
+        a = x[0]
+        y = f(sensible_deposit_fraction, a)
+        return sum((i - j) ** 2 for i, j in zip(y, sensible_share_fraction))
+
     fig, axs = plt.subplots(figsize=(8, 6))
 
     axs.plot(sensible_deposit_fraction, label='grt fraction')
@@ -208,6 +209,11 @@ def basic_plot():
     axs.set_title('Curator Share Fraction in a Volatile Market', fontsize=20)
     axs.legend(fontsize=15)
     fig.savefig('curator_volatile_market.png')
+
+    active_trading = np.array(trader_signal[PRIME_TIME:]) / trader_signal[0]
+
+    print(.2 * np.log(1+.05)**2)
+    print(np.diff(active_trading).mean())
 
 
 if __name__ == '__main__':
