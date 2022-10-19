@@ -18,7 +18,7 @@ BLOCKS_PER_PERIOD = 7200
 
 # A population of curators who trade into and out of their position at random.
 # the number of such traders.
-NUM_VOL_TRADERS: int = 20
+NUM_VOL_TRADERS: int = 100
 # the fraction of their wealth a trader will additionally purchase or withdraw.
 TRADE_FRACTION: float = 1.05
 # the probability a trader will deposit more grt.
@@ -51,6 +51,7 @@ def advance_actions(actions: List[Action],
                     vol_trader_stakes: Dict[str, float],
                     vol_trader_grt: Dict[str, float],
                     curator_stakes: Dict[str, float],
+                    abs_time: int,
                     traders_active: bool):
     """
     Advance the state machine during a time when no explicit changes are made. These actions
@@ -61,6 +62,7 @@ def advance_actions(actions: List[Action],
     :param vol_trader_stakes: The grt staked by each vol trader.
     :param vol_trader_grt: The grt owned by each vol trader.
     :param curator_stakes: The grt staked by each curator.
+    :param abs_time: The absolute time of the simulation.
     :param traders_active: Whether the traders are active.
     """
 
@@ -82,11 +84,12 @@ def advance_actions(actions: List[Action],
             else:
                 pass
 
-    for c in curator_stakes:
-        amnt = 0 * curator_stakes[c]
-        a = Action(action_type='DEPOSIT', target='curationPool', args=[c, amnt])
-        actions.append(a)
-        curator_stakes[c] += amnt
+        for c in curator_stakes:
+            if abs_time % 10 == 0:
+                amnt = (np.exp(.00047 * 10) - 1) * curator_stakes[c]
+                a = Action(action_type='DEPOSIT', target='curationPool', args=[c, amnt])
+                actions.append(a)
+                curator_stakes[c] += amnt
 
     for i in vol_trader_stakes:
         a = Action(action_type='CLAIM', target='curationPool', args=[i])
@@ -111,11 +114,11 @@ PRIME_TIME: int = 10
 SIM_TIME: int = 200
 
 # prime the system.
-for _ in range(PRIME_TIME):
-    advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=False)
+for t in range(PRIME_TIME):
+    advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, t, traders_active=False)
 
-for _ in range(SIM_TIME):
-    advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, traders_active=True)
+for t in range(SIM_TIME):
+    advance_actions(sim_actions_basic, BLOCKS_PER_PERIOD, trader_stake, trader_grt, curator_stake, PRIME_TIME+t, traders_active=True)
 
 # initial conditions
 # the shares (also used as the stake) attributed to each participant.

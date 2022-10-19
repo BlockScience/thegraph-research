@@ -59,11 +59,11 @@ class SecondaryPool:
         prevSnapshot = self.snapshotOf(account)
         prevDeposit = prevSnapshot.deposit
 
-        # Distribute accumulated shares
+        # Distribute accumulated shares from drip
         accShares = (self.accSharesPerDeposit - prevSnapshot.accSharesPerDeposit) * prevDeposit
         self.shareToken.transfer(self.address, account, accShares)
 
-        # Distribute accumulated royalties
+        # Distribute accumulated GRT royalties from share purchases
         accRoyalties = (self.accRoyaltiesPerDeposit - prevSnapshot.accRoyaltiesPerDeposit) * prevDeposit
         self.reserveToken.transfer(self.address, account, accRoyalties)
 

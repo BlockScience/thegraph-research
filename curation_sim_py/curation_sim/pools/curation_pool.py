@@ -107,7 +107,7 @@ class CurationPool(PrimaryPool):
         purchaseCost = totalSelfAssessedValue * dilutionPercentage
   
         # Transfers purchase cost into secondary pool and distributes proportional to each user's total valuation.
-        self.reserveToken.transfer(account, self.secondaryPool.address, purchaseCost)
+        self.reserveToken.transfer(fromAccount=account, toAccount=self.secondaryPool.address, amount=purchaseCost)
         self.secondaryPool._distributeRoyalties(purchaseCost)
 
         self.shareToken.mint(account, shares)
@@ -123,9 +123,9 @@ class CurationPool(PrimaryPool):
 
         prevSnapshot = self.snapshotsOf(account)
         owedRoyalties = (self.accRoyaltiesPerShare - prevSnapshot.accRoyaltiesPerShare) * prevSnapshot.shares
-          
-        self.reserveToken.transfer(self.address, account, owedRoyalties)
-      
+
+        self.reserveToken.transfer(fromAccount=self.address, toAccount=account, amount=owedRoyalties)
+
         if account == self.secondaryPool.address:
             self.secondaryPool._distributeRoyalties(owedRoyalties)
 
@@ -133,6 +133,7 @@ class CurationPool(PrimaryPool):
         self.snapshots[account].accRoyaltiesPerShare = self.accRoyaltiesPerShare
 
     def distributeRoyalties(self, royalties):
+        # GRT royalties from query fees.
         self.accRoyaltiesPerShare += (royalties/self.totalShares)
 
     # This hook is called before shares are transferred. It claims royalties those shares are entitled to.
